@@ -1,18 +1,7 @@
 services:
-  # Service 1: Postgres
-  postgres:
-    image: postgres:latest
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+  # Postgres service is now removed
 
-  # Service 2: Redis Job Queue
+  # Service 1: Redis Job Queue
   redis:
     image: redis:latest
     restart: always
@@ -21,7 +10,7 @@ services:
     volumes:
       - redis_data:/data
 
-  # Service 3: Nuxt.js Web App & API
+  # Service 2: Nuxt.js Web App & API
   webapp:
     build:
       context: ./webapp
@@ -36,11 +25,13 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
+
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
     depends_on:
-      - postgres
       - redis
 
-  # Service 4: Go Worker
+  # Service 3: Go Worker
   worker:
     build:
       context: ./worker
@@ -52,9 +43,4 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
     depends_on:
-      - postgres
       - redis
-
-volumes:
-  postgres_data:
-  redis_data:
