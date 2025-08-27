@@ -44,3 +44,6 @@ services:
       REDIS_URL: ${REDIS_URL}
     depends_on:
       - redis
+
+volumes:
+  redis_data:
