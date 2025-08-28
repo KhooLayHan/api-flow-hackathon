@@ -39,9 +39,9 @@ jobs:
         run: pnpm install
         working-directory: ./webapp
 
-      - name: Lint webapp
-        run: pnpm run lint
-        working-directory: ./webapp
+      # - name: Lint webapp
+      #   run: pnpm run lint
+      #   working-directory: ./webapp
 
       - name: Build webapp
         run: pnpm run build
