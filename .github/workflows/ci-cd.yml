@@ -1,0 +1,46 @@
+name: CI/CD -- Validate and Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25
+
+      - name: Set up Node.js with pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          package-manager: pnpm
+          cache: pnpm
+          cache-dependency-path: "webapp/pnpm-lock.yaml"
+
+      - name: Install webapp dependencies
+        run: pnpm install
+        working-directory: ./webapp
+
+      - name: Lint webapp
+        run: pnpm run lint
+        working-directory: ./webapp
+
+      - name: Build webapp
+        run: pnpm run build
+        working-directory: ./webapp
+
+      - name: Build Go worker
+        run: go build -o main main.go
+        working-directory: ./worker
