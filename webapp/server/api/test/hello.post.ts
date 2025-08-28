@@ -1,7 +1,5 @@
 import { defineEventHandler } from "h3";
-
-// @ts-ignore
-import { workflowQueue } from "~/server/utils/queue";
+import { workflowQueue } from "../../utils/queue";
 
 export default defineEventHandler(async (event) => {
   console.log("Received request to /api/test/hello");

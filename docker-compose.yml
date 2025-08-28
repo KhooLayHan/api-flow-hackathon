@@ -1,6 +1,4 @@
 services:
-  # Postgres service is now removed
-
   # Service 1: Redis Job Queue
   redis:
     image: redis:8.0-alpine
