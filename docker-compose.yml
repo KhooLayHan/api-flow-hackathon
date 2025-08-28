@@ -3,7 +3,7 @@ services:
 
   # Service 1: Redis Job Queue
   redis:
-    image: redis:latest
+    image: redis:8.0-alpine
     restart: always
     ports:
       - "6379:6379"
