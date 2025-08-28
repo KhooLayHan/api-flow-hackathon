@@ -45,6 +45,8 @@ jobs:
 
       - name: Build webapp
         run: pnpm run build
+        working-directory: ./webapp
 
       - name: Build Go worker
         run: go build -o main main.go
+        working-directory: ./worker
