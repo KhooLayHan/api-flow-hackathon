@@ -3,10 +3,4 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
   modules: ["@nuxt/eslint", "@nuxt/icon", "@nuxt/image"],
-  // nitro: {
-  //   externals: {
-  //     // Force-bundles these packages into the server output.
-  //     inline: ["bullmq", "ioredis"],
-  //   },
-  // },
 });
