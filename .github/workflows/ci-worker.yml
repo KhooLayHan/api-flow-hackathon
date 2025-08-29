@@ -1,0 +1,33 @@
+name: CI -- Worker
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - worker/**
+      - .github/workflows/ci-worker.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - worker/**
+      - .github/workflows/ci-worker.yml
+
+jobs:
+  validate-and-build-worker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25
+          working-directory: ./worker
+
+      - name: Build Go worker
+        run: go build -o main main.go
+        working-directory: ./worker
