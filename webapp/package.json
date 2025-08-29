@@ -9,6 +9,9 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "oxlint && eslint",
+    "lint:check": "prettier . --check",
+    "lint:fix": "oxlint --fix && eslint --fix",
+    "lint:format": "prettier . --write --list-different",
     "test": "vitest"
   },
   "dependencies": {
