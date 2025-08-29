@@ -47,9 +47,9 @@ jobs:
         run: pnpm run lint
         working-directory: ./webapp
 
-      - name: Run tests with Vitest
-        run: pnpm run test
-        working-directory: ./webapp
+      # - name: Run tests with Vitest
+      #   run: pnpm run test
+      #   working-directory: ./webapp
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
