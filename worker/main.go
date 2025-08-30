@@ -8,18 +8,16 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
-	// "fmt"
-	// "net/http"
 )
 
-// This type must match the structure of the payload sent by the Nuxt API
+// TestMessagePayload must match the structure of the payload sent by the Nuxt API.
 type TestMessagePayload struct {
 	Message string `json:"message"`
 	SentAt  string `json:"sentAt"`
 }
 
-// Handler function for the test message payload
-func handleTestMessageTask(ctx context.Context, task *asynq.Task) error {
+// Handler function for the test message payload.
+func handleTestMessageTask(_ context.Context, task *asynq.Task) error {
 	var payload TestMessagePayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		log.Printf("ERROR: Failed to unmarshal payload for task %s: %v", task.Type(), err)
@@ -31,14 +29,17 @@ func handleTestMessageTask(ctx context.Context, task *asynq.Task) error {
 }
 
 func main() {
-	godotenv.Load("../.env")
+	err := godotenv.Load("../.env")
+	if err != nil {
+		log.Fatalf("Failed to load .env file: %v", err)
+	}
 
-	redisUrl := os.Getenv("REDIS_URL")
-	if redisUrl == "" {
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
 		log.Fatal("REDIS_URL environment variable is not set!")
 	}
 
-	redisConnection, err := asynq.ParseRedisURI(redisUrl)
+	redisConnection, err := asynq.ParseRedisURI(redisURL)
 	if err != nil {
 		log.Fatalf("Failed to parse Redis URI: %v", err)
 	}
@@ -54,20 +55,7 @@ func main() {
 	mux.HandleFunc("test-message", handleTestMessageTask)
 
 	log.Println("Worker service started. Listening for jobs...")
-	if err := srv.Run(mux); err != nil {
-		log.Fatalf("failed to start server: %v", err)
+	if srvErr := srv.Run(mux); srvErr != nil {
+		log.Fatalf("failed to start server: %v", srvErr)
 	}
-
-	// client := asynq.NewClient(asynq.RedisClientOpt{Addr: redisUrl})
-	// defer client.Close()
-
-	// // Register handlers for tasks
-	// if err := client.Register(handleTestMessageTask); err != nil {
-	// 	log.Fatalf("failed to register handler: %v", err)
-	// }
-
-	// // Start processing tasks
-	// if err := client.Start(); err != nil {
-	// 	log.Fatalf("failed to start client: %v", err)
-	// }
 }
