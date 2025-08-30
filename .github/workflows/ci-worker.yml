@@ -29,8 +29,10 @@ jobs:
           working-directory: ./worker
 
       - name: Check formatting and linting with golangci-lint
-        run: golangci-lint run
-        working-directory: ./worker
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.4.0
+          working-directory: ./worker
 
       - name: Vet code for errors
         run: go vet
