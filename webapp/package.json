@@ -19,6 +19,7 @@
     "@nuxt/icon": "2.0.0",
     "@nuxt/image": "1.11.0",
     "@pinia/nuxt": "^0.11.2",
+    "@vue-flow/core": "^1.46.0",
     "@vueuse/core": "^13.8.0",
     "@vueuse/nuxt": "^13.8.0",
     "bullmq": "^5.58.2",
