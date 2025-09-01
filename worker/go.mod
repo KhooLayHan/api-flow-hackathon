@@ -1,4 +1,4 @@
-module api-flow/worker
+module api-flow-hackathon/worker
 
 go 1.25.0
 

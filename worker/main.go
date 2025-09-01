@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
@@ -14,6 +15,21 @@ import (
 type TestMessagePayload struct {
 	Message string `json:"message"`
 	SentAt  string `json:"sentAt"`
+}
+
+type ExecuteWorkloadPayload struct {
+	WorkflowID int `json:"workflowId"`
+}
+
+func handleExecuteWorkflowTask(_ context.Context, t *asynq.Task) error {
+	var p ExecuteWorkloadPayload
+	if err := json.Unmarshal(t.Payload(), &p); err != nil {
+		log.Printf("ERROR: Failed to unmarshal payload for task %s: %v", t.Type(), err)
+		return err
+	}
+
+	log.Printf("Received a job to execute workflow with ID: %d", p.WorkflowID)
+	return nil
 }
 
 // Handler function for the test message payload.
@@ -29,8 +45,16 @@ func handleTestMessageTask(_ context.Context, task *asynq.Task) error {
 }
 
 func main() {
-	err := godotenv.Load("../.env")
+	// Get the directory where the executable is located
+	execPath, err := os.Executable()
 	if err != nil {
+		log.Fatalf("Failed to get executable path: %v", err)
+	}
+
+	execDir := filepath.Dir(execPath)
+	envPath := filepath.Join(execDir, ".env")
+
+	if err := godotenv.Load(envPath); err != nil {
 		log.Fatalf("Failed to load .env file: %v", err)
 	}
 
