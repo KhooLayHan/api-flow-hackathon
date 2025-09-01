@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/hibiken/asynq"
-	"github.com/joho/godotenv"
 )
 
 // TestMessagePayload must match the structure of the payload sent by the Nuxt API.
@@ -45,19 +43,6 @@ func handleTestMessageTask(_ context.Context, task *asynq.Task) error {
 }
 
 func main() {
-	// Get the directory where the executable is located
-	execPath, err := os.Executable()
-	if err != nil {
-		log.Fatalf("Failed to get executable path: %v", err)
-	}
-
-	execDir := filepath.Dir(execPath)
-	envPath := filepath.Join(execDir, ".env")
-
-	if err := godotenv.Load(envPath); err != nil {
-		log.Fatalf("Failed to load .env file: %v", err)
-	}
-
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Fatal("REDIS_URL environment variable is not set!")
