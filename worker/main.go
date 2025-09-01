@@ -77,9 +77,10 @@ func main() {
 
 	mux := asynq.NewServeMux()
 	mux.HandleFunc("test-message", handleTestMessageTask)
+	mux.HandleFunc("execute-workflow-v1", handleExecuteWorkflowTask)
 
 	log.Println("Worker service started. Listening for jobs...")
 	if srvErr := srv.Run(mux); srvErr != nil {
-		log.Fatalf("failed to start server: %v", srvErr)
+		log.Fatalf("Failed to start server: %v", srvErr)
 	}
 }
