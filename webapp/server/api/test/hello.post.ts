@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3';
 import { workflowQueue } from '../../utils/queue';
 
-export default defineEventHandler(async event => {
+export default defineEventHandler(async () => {
   console.log('Received request to /api/test/hello');
 
   const jobName = 'test-message';
