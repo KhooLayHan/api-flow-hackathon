@@ -6,4 +6,9 @@ import oxlint from 'eslint-plugin-oxlint';
 export default withNuxt(
   // Your custom configs here
   oxlint.configs['flat/recommended'],
+  {
+    rules: {
+      'vue/no-multiple-template-root': 'off',
+    },
+  },
 );
