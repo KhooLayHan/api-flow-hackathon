@@ -15,6 +15,13 @@
       "when": 1756646998370,
       "tag": "0001_sweet_steve_rogers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1756990791087,
+      "tag": "0002_goofy_fixer",
+      "breakpoints": true
     }
   ]
 }
