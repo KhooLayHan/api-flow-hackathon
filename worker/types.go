@@ -19,7 +19,7 @@ type Edge struct {
 	Target string `json:"target"`
 }
 
-// UserCredential represents to hold the saved credentials
+// UserCredential represents to hold the saved credentials.
 type UserCredential struct {
 	ID          string
 	UserID      string

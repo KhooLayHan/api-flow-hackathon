@@ -12,60 +12,6 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-// TestMessagePayload must match the structure of the payload sent by the Nuxt API.
-type TestMessagePayload struct {
-	Message string `json:"message"`
-	SentAt  string `json:"sentAt"`
-}
-
-type ExecuteWorkloadPayload struct {
-	WorkflowID int    `json:"workflowId"`
-	UserID     string `json:"userId"`
-}
-
-func handleExecuteWorkflowTask(_ context.Context, t *asynq.Task) error {
-	var p ExecuteWorkloadPayload
-	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		log.Printf("ERROR: Failed to unmarshal payload for task %s: %v", t.Type(), err)
-		return err
-	}
-
-	log.Printf("Received a job to execute workflow with ID: %d for user %s", p.WorkflowID, p.UserID)
-
-	// 1. Fetch data from the database
-	workflowDef, err := fetchWorkflowDefinition(p.WorkflowID)
-	if err != nil {
-		log.Printf("ERROR: Failed to fetch workflow definition for ID %d: %v", p.WorkflowID, err)
-		return err
-	}
-
-	slackCred, err := fetchUserCredential(p.UserID, "slack")
-	if err != nil {
-		log.Printf("ERROR: Failed to fetch Slack credential for user %s: %v", p.UserID, err)
-		return err
-	}
-
-	// 2. Simple execution logic: Find the Slack node and execute it
-	for _, node := range workflowDef.Nodes {
-		if node.Type == "slackAction" {
-			channel, _ := node.Data["channel"].(string)
-			message, _ := node.Data["message"].(string)
-
-			log.Printf("Found Slack action. Sending '%s' to user %s", message, channel)
-
-			// 3. Make the API call to Slack
-			err := postToSlack(slackCred.AccessToken, channel, message)
-			if err != nil {
-				log.Printf("ERROR: Failed to post to Slack: %v", err)
-				return err
-			}
-		}
-	}
-
-	log.Printf("Finished executing Workflow ID: %d", p.WorkflowID)
-	return nil
-}
-
 func postToSlack(token, channel, text string) error {
 	payload := map[string]string{"channel": channel, "text": text}
 	jsonPayload, _ := json.Marshal(payload)
@@ -86,7 +32,7 @@ func postToSlack(token, channel, text string) error {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("Slack API return non-200 status code: %s", response.Status)
+		return fmt.Errorf("slack api return non-200 status code: %s", response.Status)
 	}
 
 	return nil
@@ -105,34 +51,45 @@ func handleTestMessageTask(_ context.Context, task *asynq.Task) error {
 }
 
 func main() {
-	if err := connectToDb(); err != nil {
-		log.Fatalf("FATAL: Failed to connect to database: %v", err)
+	// 1. Create a new database connection pool.
+	dbPool, err := newDBConnectionPool()
+	if err != nil {
+		log.Fatalf("FATAL: Failed to connect to database pool: %v", err)
 	}
-	defer dbConn.Close(context.Background())
+	defer dbPool.Close()
 
+	// 2. Create a new Redis connection client.
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		log.Fatal("REDIS_URL environment variable is not set!")
+		log.Fatal("FATAL: REDIS_URL environment variable is not set!")
 	}
 
 	redisConnection, err := asynq.ParseRedisURI(redisURL)
 	if err != nil {
-		log.Fatalf("Failed to parse Redis URI: %v", err)
+		log.Fatalf("FATAL: Failed to parse Redis URI: %v", err)
 	}
 
-	srv := asynq.NewServer(redisConnection, asynq.Config{
-		// Queue must match the name from Nuxt
-		Queues: map[string]int{
-			"workflows": 1,
-		},
-	})
+	// 3. Create a new TaskProcessor.
+	processor := NewTaskProcessor(redisConnection.(asynq.RedisClientOpt), dbPool)
 
-	mux := asynq.NewServeMux()
-	mux.HandleFunc("test-message", handleTestMessageTask)
-	mux.HandleFunc("execute-workflow-v1", handleExecuteWorkflowTask)
-
-	log.Println("Worker service started. Listening for jobs...")
-	if srvErr := srv.Run(mux); srvErr != nil {
-		log.Fatalf("Failed to start server: %v", srvErr)
+	// 4. Start the processor.
+	if err := processor.Start(); err != nil {
+		log.Fatalf("FATAL: Could not run worker server: %v", err)
 	}
+
+	// srv := asynq.NewServer(redisConnection, asynq.Config{
+	// 	// Queue must match the name from Nuxt
+	// 	Queues: map[string]int{
+	// 		"workflows": 1,
+	// 	},
+	// })
+
+	// mux := asynq.NewServeMux()
+	// mux.HandleFunc("test-message", handleTestMessageTask)
+	// mux.HandleFunc("execute-workflow-v1", handleExecuteWorkflowTask)
+
+	// log.Println("Worker service started. Listening for jobs...")
+	// if srvErr := srv.Run(mux); srvErr != nil {
+	// 	log.Fatalf("Failed to start server: %v", srvErr)
+	// }
 }
