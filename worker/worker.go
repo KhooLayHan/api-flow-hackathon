@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,8 +12,9 @@ import (
 
 // TaskProcessor is a struct that holds all the dependencies our task handlers will need.
 type TaskProcessor struct {
-	db  *pgxpool.Pool
-	srv *asynq.Server
+	db     *pgxpool.Pool
+	srv    *asynq.Server
+	logger *slog.Logger
 }
 
 // TestMessagePayload must match the structure of the payload sent by the Nuxt API.
@@ -32,8 +33,8 @@ type ExecuteWorkloadPayload struct {
 func NewTaskProcessor(redisOpt asynq.RedisClientOpt, dbPool *pgxpool.Pool) *TaskProcessor {
 	server := asynq.NewServer(redisOpt, asynq.Config{
 		Queues: map[string]int{"workflows": 1},
-		ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-			log.Printf("Asynq Error: type=%s, payload=%s, err=%w", task.Type(), task.Payload(), err)
+		ErrorHandler: asynq.ErrorHandlerFunc(func(_ context.Context, task *asynq.Task, err error) {
+			slog.Error("Asynq: type=%s, payload=%s, err=%v", task.Type(), task.Payload(), err)
 		}),
 	})
 
@@ -61,7 +62,11 @@ func (p *TaskProcessor) fetchWorkflowDefinition(ctx context.Context, workflowID 
 	return &workflowDef, nil
 }
 
-func (p *TaskProcessor) fetchUserCredential(ctx context.Context, userID string, service string) (*UserCredential, error) {
+func (p *TaskProcessor) fetchUserCredential(
+	ctx context.Context,
+	userID string,
+	service string,
+) (*UserCredential, error) {
 	var cred UserCredential
 
 	err := p.db.QueryRow(ctx, "SELECT access_token FROM user_credentials WHERE user_id = $1 AND service = $2", userID, service).
@@ -75,52 +80,52 @@ func (p *TaskProcessor) fetchUserCredential(ctx context.Context, userID string, 
 // handleExecuteWorkflowTask handles the execution of a workflow task.
 func (p *TaskProcessor) handleExecuteWorkflowTask(ctx context.Context, t *asynq.Task) error {
 	var payload ExecuteWorkloadPayload
-	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		log.Printf("ERROR: Failed to unmarshal payload for task %s: %v", t.Type(), err)
-		return err
+	if payloadErr := json.Unmarshal(t.Payload(), &payload); payloadErr != nil {
+		slog.ErrorContext("Failed to unmarshal payload for task %s: %v", t.Type(), payloadErr)
+		return payloadErr
 	}
 
-	log.Printf("Received a job to execute workflow with ID: %d for user %s", payload.WorkflowID, payload.UserID)
+	slog.Info("Received a job to execute workflow with ID: %d for user %s", payload.WorkflowID, payload.UserID)
 
-	// 1. Fetch data from the database
-	workflowDef, err := p.fetchWorkflowDefinition(ctx, payload.WorkflowID)
-	if err != nil {
-		log.Printf("ERROR: Failed to fetch workflow definition for ID %d: %v", payload.WorkflowID, err)
-		return err
+	// 1. Fetch data from the database.
+	workflowDef, workflowDefErr := p.fetchWorkflowDefinition(ctx, payload.WorkflowID)
+	if workflowDefErr != nil {
+		slog.Error("Failed to fetch workflow definition for ID %d: %v", payload.WorkflowID, workflowDefErr)
+		return workflowDefErr
 	}
 
-	slackCred, err := p.fetchUserCredential(ctx, payload.UserID, "slack")
-	if err != nil {
-		log.Printf("ERROR: Failed to fetch Slack credential for user %s: %v", payload.UserID, err)
-		return err
+	slackCred, slackCredErr := p.fetchUserCredential(ctx, payload.UserID, "slack")
+	if slackCredErr != nil {
+		slog.Error("Failed to fetch Slack credential for user %s: %v", payload.UserID, slackCredErr)
+		return slackCredErr
 	}
 
-	// 2. Simple execution logic: Find the Slack node and execute it
+	// 2. Simple execution logic: Find the Slack node and execute it.
 	for _, node := range workflowDef.Nodes {
 		if node.Type == "slackAction" {
 			channel, _ := node.Data["channel"].(string)
 			message, _ := node.Data["message"].(string)
 
-			log.Printf("Found Slack action. Sending '%s' to user %s", message, channel)
+			slog.Info("Found Slack action. Sending '%s' to user %s", message, channel)
 
-			// 3. Make the API call to Slack
+			// 3. Make the API call to Slack.
 			err := postToSlack(slackCred.AccessToken, channel, message)
 			if err != nil {
-				log.Printf("ERROR: Failed to post to Slack: %v", err)
+				slog.Error("ERROR: Failed to post to Slack: %v", err)
 				return err
 			}
 		}
 	}
 
-	log.Printf("Finished executing Workflow ID: %d", payload.WorkflowID)
+	slog.Info("Finished executing Workflow ID: %d", payload.WorkflowID)
 	return nil
 }
 
-// Starts the worker server
+// Start starts the worker server.
 func (p *TaskProcessor) Start() error {
 	mux := asynq.NewServeMux()
 	mux.HandleFunc("execute-workflow-v1", p.handleExecuteWorkflowTask)
 
-	log.Println("Go Worker service started. Listening for jobs...")
+	slog.InfoContext("Go Worker service started. Listening for jobs...")
 	return p.srv.Run(mux)
 }

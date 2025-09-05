@@ -3,22 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func newDBConnectionPool() (*pgxpool.Pool, error) {
-	connPool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+	connPool, connPoolErr := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+	if connPoolErr != nil {
+		return nil, fmt.Errorf("failed to create connection pool: %w", connPoolErr)
 	}
 
 	if err := connPool.Ping(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Println("Database connection pool created successfully.")
+	slog.Info("Database connection pool created successfully.")
 	return connPool, nil
 }

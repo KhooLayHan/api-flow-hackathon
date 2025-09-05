@@ -16,7 +16,12 @@ func postToSlack(token, channel, text string) error {
 	payload := map[string]string{"channel": channel, "text": text}
 	jsonPayload, _ := json.Marshal(payload)
 
-	req, err := http.NewRequest("POST", "https://slack.com/api/chat.postMessage", bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		"https://slack.com/api/chat.postMessage",
+		bytes.NewBuffer(jsonPayload),
+	)
 	if err != nil {
 		return err
 	}
@@ -38,35 +43,26 @@ func postToSlack(token, channel, text string) error {
 	return nil
 }
 
-// Handler function for the test message payload.
-func handleTestMessageTask(_ context.Context, task *asynq.Task) error {
-	var payload TestMessagePayload
-	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
-		log.Printf("ERROR: Failed to unmarshal payload for task %s: %v", task.Type(), err)
-		return err
-	}
-
-	log.Printf("Received a job test message: %s, Sent at: %s", payload.Message, payload.SentAt)
-	return nil
-}
-
 func main() {
 	// 1. Create a new database connection pool.
-	dbPool, err := newDBConnectionPool()
-	if err != nil {
-		log.Fatalf("FATAL: Failed to connect to database pool: %v", err)
+	dbPool, dbPoolErr := newDBConnectionPool()
+	if dbPoolErr != nil {
+		log.Printf("FATAL: Failed to connect to database pool: %v", dbPoolErr)
+		return
 	}
 	defer dbPool.Close()
 
 	// 2. Create a new Redis connection client.
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		log.Fatal("FATAL: REDIS_URL environment variable is not set!")
+		log.Printf("FATAL: REDIS_URL environment variable is not set!")
+		return
 	}
 
-	redisConnection, err := asynq.ParseRedisURI(redisURL)
-	if err != nil {
-		log.Fatalf("FATAL: Failed to parse Redis URI: %v", err)
+	redisConnection, redisErr := asynq.ParseRedisURI(redisURL)
+	if redisErr != nil {
+		log.Printf("FATAL: Failed to parse Redis URI: %v", redisErr)
+		return
 	}
 
 	// 3. Create a new TaskProcessor.
@@ -74,22 +70,7 @@ func main() {
 
 	// 4. Start the processor.
 	if err := processor.Start(); err != nil {
-		log.Fatalf("FATAL: Could not run worker server: %v", err)
+		log.Printf("FATAL: Could not run worker server: %v", err)
+		return
 	}
-
-	// srv := asynq.NewServer(redisConnection, asynq.Config{
-	// 	// Queue must match the name from Nuxt
-	// 	Queues: map[string]int{
-	// 		"workflows": 1,
-	// 	},
-	// })
-
-	// mux := asynq.NewServeMux()
-	// mux.HandleFunc("test-message", handleTestMessageTask)
-	// mux.HandleFunc("execute-workflow-v1", handleExecuteWorkflowTask)
-
-	// log.Println("Worker service started. Listening for jobs...")
-	// if srvErr := srv.Run(mux); srvErr != nil {
-	// 	log.Fatalf("Failed to start server: %v", srvErr)
-	// }
 }
