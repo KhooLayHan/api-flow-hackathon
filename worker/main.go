@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/hibiken/asynq"
@@ -16,7 +19,8 @@ type TestMessagePayload struct {
 }
 
 type ExecuteWorkloadPayload struct {
-	WorkflowID int `json:"workflowId"`
+	WorkflowID int    `json:"workflowId"`
+	UserID     string `json:"userId"`
 }
 
 func handleExecuteWorkflowTask(_ context.Context, t *asynq.Task) error {
@@ -26,7 +30,65 @@ func handleExecuteWorkflowTask(_ context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	log.Printf("Received a job to execute workflow with ID: %d", p.WorkflowID)
+	log.Printf("Received a job to execute workflow with ID: %d for user %s", p.WorkflowID, p.UserID)
+
+	// 1. Fetch data from the database
+	workflowDef, err := fetchWorkflowDefinition(p.WorkflowID)
+	if err != nil {
+		log.Printf("ERROR: Failed to fetch workflow definition for ID %d: %v", p.WorkflowID, err)
+		return err
+	}
+
+	slackCred, err := fetchUserCredential(p.UserID, "slack")
+	if err != nil {
+		log.Printf("ERROR: Failed to fetch Slack credential for user %s: %v", p.UserID, err)
+		return err
+	}
+
+	// 2. Simple execution logic: Find the Slack node and execute it
+	for _, node := range workflowDef.Nodes {
+		if node.Type == "slackAction" {
+			channel, _ := node.Data["channel"].(string)
+			message, _ := node.Data["message"].(string)
+
+			log.Printf("Found Slack action. Sending '%s' to user %s", message, channel)
+
+			// 3. Make the API call to Slack
+			err := postToSlack(slackCred.AccessToken, channel, message)
+			if err != nil {
+				log.Printf("ERROR: Failed to post to Slack: %v", err)
+				return err
+			}
+		}
+	}
+
+	log.Printf("Finished executing Workflow ID: %d", p.WorkflowID)
+	return nil
+}
+
+func postToSlack(token, channel, text string) error {
+	payload := map[string]string{"channel": channel, "text": text}
+	jsonPayload, _ := json.Marshal(payload)
+
+	req, err := http.NewRequest("POST", "https://slack.com/api/chat.postMessage", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Header.Set("Authorization", "Bearer"+token)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("Slack API return non-200 status code: %s", response.Status)
+	}
+
 	return nil
 }
 
@@ -43,6 +105,11 @@ func handleTestMessageTask(_ context.Context, task *asynq.Task) error {
 }
 
 func main() {
+	if err := connectToDb(); err != nil {
+		log.Fatalf("FATAL: Failed to connect to database: %v", err)
+	}
+	defer dbConn.Close(context.Background())
+
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Fatal("REDIS_URL environment variable is not set!")
