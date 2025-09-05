@@ -1,4 +1,4 @@
-import { pgTable, text, serial, jsonb, timestamp, varchar, uuid, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, text, serial, jsonb, timestamp, varchar, uuid } from 'drizzle-orm/pg-core';
 
 export const workflows = pgTable('workflows', {
   id: serial('id').primaryKey(),
