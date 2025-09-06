@@ -1,6 +1,4 @@
 <script setup>
-import { useSupabaseClient } from '@supabase/auth-helpers-vue';
-
 const supabase = useSupabaseClient();
 
 async function loginWithGitHub() {
