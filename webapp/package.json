@@ -12,7 +12,12 @@
     "lint:check": "prettier . --check",
     "lint:fix": "oxlint --fix && eslint --fix",
     "lint:format": "prettier . --write --list-different",
-    "test": "vitest"
+    "test": "vitest",
+    "db": "drizzle-kit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:pull": "drizzle-kit pull"
   },
   "dependencies": {
     "@nuxt/eslint": "1.9.0",
