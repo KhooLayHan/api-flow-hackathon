@@ -1,53 +1,18 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
 	"os"
 
 	"github.com/hibiken/asynq"
 )
 
-func postToSlack(token, channel, text string) error {
-	payload := map[string]string{"channel": channel, "text": text}
-	jsonPayload, _ := json.Marshal(payload)
-
-	req, err := http.NewRequestWithContext(
-		context.Background(),
-		http.MethodPost,
-		"https://slack.com/api/chat.postMessage",
-		bytes.NewBuffer(jsonPayload),
-	)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	req.Header.Set("Authorization", "Bearer"+token)
-
-	client := &http.Client{}
-	response, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("slack api return non-200 status code: %s", response.Status)
-	}
-
-	return nil
-}
-
 func main() {
+	logger := NewLogger()
+
 	// 1. Create a new database connection pool.
-	dbPool, dbPoolErr := newDBConnectionPool()
+	dbPool, dbPoolErr := newDBConnectionPool(logger)
 	if dbPoolErr != nil {
-		log.Printf("FATAL: Failed to connect to database pool: %v", dbPoolErr)
+		logger.Error("Failed to connect to database pool.", "err", dbPoolErr)
 		return
 	}
 	defer dbPool.Close()
@@ -55,22 +20,29 @@ func main() {
 	// 2. Create a new Redis connection client.
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		log.Printf("FATAL: REDIS_URL environment variable is not set!")
+		logger.Error("FATAL: REDIS_URL environment variable is not set!")
 		return
 	}
 
-	redisConnection, redisErr := asynq.ParseRedisURI(redisURL)
+	redisConnOpt, redisErr := asynq.ParseRedisURI(redisURL)
 	if redisErr != nil {
-		log.Printf("FATAL: Failed to parse Redis URI: %v", redisErr)
+		logger.Error("Failed to parse Redis URI.", "err", redisErr)
+		return
+	}
+
+	redisClientOpt, ok := redisConnOpt.(asynq.RedisClientOpt)
+	if !ok {
+		logger.Error("Failed to convert Redis connection options to RedisClientOpt type.")
 		return
 	}
 
 	// 3. Create a new TaskProcessor.
-	processor := NewTaskProcessor(redisConnection.(asynq.RedisClientOpt), dbPool)
+	processor := NewTaskProcessor(redisClientOpt, dbPool, logger)
 
 	// 4. Start the processor.
+	logger.Info("Starting worker service...")
 	if err := processor.Start(); err != nil {
-		log.Printf("FATAL: Could not run worker server: %v", err)
+		logger.Error("Could not run worker server.", "err", err)
 		return
 	}
 }

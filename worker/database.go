@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func newDBConnectionPool() (*pgxpool.Pool, error) {
+func newDBConnectionPool(logger *slog.Logger) (*pgxpool.Pool, error) {
 	connPool, connPoolErr := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	if connPoolErr != nil {
 		return nil, fmt.Errorf("failed to create connection pool: %w", connPoolErr)
@@ -19,6 +19,6 @@ func newDBConnectionPool() (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	slog.Info("Database connection pool created successfully.")
+	logger.Info("Database connection pool created successfully.")
 	return connPool, nil
 }

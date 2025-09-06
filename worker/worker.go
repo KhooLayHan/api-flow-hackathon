@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,17 +32,21 @@ type ExecuteWorkloadPayload struct {
 }
 
 // NewTaskProcessor creates a new TaskProcessor instance.
-func NewTaskProcessor(redisOpt asynq.RedisClientOpt, dbPool *pgxpool.Pool) *TaskProcessor {
+func NewTaskProcessor(redisOpt asynq.RedisClientOpt, dbPool *pgxpool.Pool, logger *slog.Logger) *TaskProcessor {
 	server := asynq.NewServer(redisOpt, asynq.Config{
 		Queues: map[string]int{"workflows": 1},
-		ErrorHandler: asynq.ErrorHandlerFunc(func(_ context.Context, task *asynq.Task, err error) {
-			slog.Error("Asynq: type=%s, payload=%s, err=%v", task.Type(), task.Payload(), err)
+		ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
+			logger.ErrorContext(ctx, "Asynq task processing failed.",
+				"error", err.Error(),
+				"task_type", task.Type(),
+				"task_payload", string(task.Payload()))
 		}),
 	})
 
 	return &TaskProcessor{
-		db:  dbPool,
-		srv: server,
+		db:     dbPool,
+		srv:    server,
+		logger: logger,
 	}
 }
 
@@ -81,22 +87,36 @@ func (p *TaskProcessor) fetchUserCredential(
 func (p *TaskProcessor) handleExecuteWorkflowTask(ctx context.Context, t *asynq.Task) error {
 	var payload ExecuteWorkloadPayload
 	if payloadErr := json.Unmarshal(t.Payload(), &payload); payloadErr != nil {
-		slog.ErrorContext("Failed to unmarshal payload for task %s: %v", t.Type(), payloadErr)
+		p.logger.ErrorContext(ctx, "Failed to unmarshal payload", "error", payloadErr)
 		return payloadErr
 	}
 
-	slog.Info("Received a job to execute workflow with ID: %d for user %s", payload.WorkflowID, payload.UserID)
+	p.logger.InfoContext(
+		ctx,
+		"Received a job to execute workflow",
+		"workflowID",
+		payload.WorkflowID,
+		"userID",
+		payload.UserID,
+	)
 
 	// 1. Fetch data from the database.
 	workflowDef, workflowDefErr := p.fetchWorkflowDefinition(ctx, payload.WorkflowID)
 	if workflowDefErr != nil {
-		slog.Error("Failed to fetch workflow definition for ID %d: %v", payload.WorkflowID, workflowDefErr)
+		p.logger.ErrorContext(
+			ctx,
+			"Failed to fetch workflow definition",
+			"workflowID",
+			payload.WorkflowID,
+			"error",
+			workflowDefErr,
+		)
 		return workflowDefErr
 	}
 
 	slackCred, slackCredErr := p.fetchUserCredential(ctx, payload.UserID, "slack")
 	if slackCredErr != nil {
-		slog.Error("Failed to fetch Slack credential for user %s: %v", payload.UserID, slackCredErr)
+		p.logger.ErrorContext(ctx, "Failed to fetch Slack credential", "userID", payload.UserID, "error", slackCredErr)
 		return slackCredErr
 	}
 
@@ -106,18 +126,58 @@ func (p *TaskProcessor) handleExecuteWorkflowTask(ctx context.Context, t *asynq.
 			channel, _ := node.Data["channel"].(string)
 			message, _ := node.Data["message"].(string)
 
-			slog.Info("Found Slack action. Sending '%s' to user %s", message, channel)
+			p.logger.InfoContext(
+				ctx,
+				"Found Slack action and sending",
+				"workflowID",
+				payload.WorkflowID,
+				"message",
+				message,
+				"channel",
+				channel,
+			)
 
 			// 3. Make the API call to Slack.
 			err := postToSlack(slackCred.AccessToken, channel, message)
 			if err != nil {
-				slog.Error("ERROR: Failed to post to Slack: %v", err)
+				p.logger.ErrorContext(ctx, "Failed to post to Slack", "workflowID", payload.WorkflowID, "error", err)
 				return err
 			}
 		}
 	}
 
-	slog.Info("Finished executing Workflow ID: %d", payload.WorkflowID)
+	p.logger.InfoContext(ctx, "Finished executing workflow successfully", "workflowID", payload.WorkflowID)
+	return nil
+}
+
+func postToSlack(token, channel, text string) error {
+	payload := map[string]string{"channel": channel, "text": text}
+	jsonPayload, _ := json.Marshal(payload)
+
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		"https://slack.com/api/chat.postMessage",
+		bytes.NewBuffer(jsonPayload),
+	)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Header.Set("Authorization", "Bearer"+token)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("slack api return non-200 status code: %s", response.Status)
+	}
+
 	return nil
 }
 
@@ -126,6 +186,6 @@ func (p *TaskProcessor) Start() error {
 	mux := asynq.NewServeMux()
 	mux.HandleFunc("execute-workflow-v1", p.handleExecuteWorkflowTask)
 
-	slog.InfoContext("Go Worker service started. Listening for jobs...")
+	p.logger.Info("Go Worker service started. Listening for jobs...")
 	return p.srv.Run(mux)
 }
