@@ -4,6 +4,15 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxt/eslint', '@nuxt/icon', '@nuxt/image', '@nuxtjs/supabase', '@nuxtjs/tailwindcss'],
 
+  tailwindcss: {
+    editorSupport: true,
+  },
+
+  devServer: {
+    port: Number(process.env.PORT) || 3000,
+    host: '0.0.0.0',
+  },
+
   supabase: {
     clientOptions: {
       auth: {
