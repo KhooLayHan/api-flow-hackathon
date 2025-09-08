@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev --host 0.0.0.0",
+    "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "start": "nuxt start --post $PORT",
+    "start": "HOST=0.0.0.0 PORT=$PORT nuxt start",
     "postinstall": "nuxt prepare",
     "lint": "oxlint && eslint",
     "lint:check": "prettier . --check",
