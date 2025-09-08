@@ -48,7 +48,7 @@ type TestMessagePayload struct {
 }
 
 type ExecuteWorkloadPayload struct {
-	WorkflowID     string            `json:"workflow_id"`
+	WorkflowID     int               `json:"workflow_id"`
 	UserID         string            `json:"user_id"`
 	TriggerPayload GitHubPushPayload `json:"trigger_payload"`
 }

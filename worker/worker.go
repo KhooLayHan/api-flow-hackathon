@@ -7,29 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-// TaskProcessor is a struct that holds all the dependencies our task handlers will need.
-type TaskProcessor struct {
-	db     *pgxpool.Pool
-	srv    *asynq.Server
-	logger *slog.Logger
-}
-
-// TestMessagePayload must match the structure of the payload sent by the Nuxt API.
-type TestMessagePayload struct {
-	Message string `json:"message"`
-	SentAt  string `json:"sentAt"`
-}
-
-// ExecuteWorkloadPayload must match the structure of the payload sent by the Nuxt API.
-type ExecuteWorkloadPayload struct {
-	WorkflowID int    `json:"workflowId"`
-	UserID     string `json:"userId"`
-}
 
 // NewTaskProcessor creates a new TaskProcessor instance.
 func NewTaskProcessor(redisOpt asynq.RedisClientOpt, dbPool *pgxpool.Pool, logger *slog.Logger) *TaskProcessor {
@@ -124,7 +106,13 @@ func (p *TaskProcessor) handleExecuteWorkflowTask(ctx context.Context, t *asynq.
 	for _, node := range workflowDef.Nodes {
 		if node.Type == "slackAction" {
 			channel, _ := node.Data["channel"].(string)
-			message, _ := node.Data["message"].(string)
+			messageTemplate, _ := node.Data["message"].(string)
+
+			// TODO: Uses simple string replacement for now, will be updated with a proper templating engine.
+			finalMessage := strings.ReplaceAll(messageTemplate, "{commit.message}", payload.TriggerPayload.HeadCommit.Message)
+			finalMessage = strings.ReplaceAll(finalMessage, "{pusher.name}", payload.TriggerPayload.Pusher.Name)
+			finalMessage = strings.ReplaceAll(finalMessage, "{repo.name}", payload.TriggerPayload.Repository.FullName)
+			finalMessage = fmt.Sprintf("%s\nView Commit: %s", finalMessage, payload.TriggerPayload.HeadCommit.URL)
 
 			p.logger.InfoContext(
 				ctx,
@@ -132,13 +120,13 @@ func (p *TaskProcessor) handleExecuteWorkflowTask(ctx context.Context, t *asynq.
 				"workflowID",
 				payload.WorkflowID,
 				"message",
-				message,
+				messageTemplate,
 				"channel",
 				channel,
 			)
 
 			// 3. Make the API call to Slack.
-			err := postToSlack(slackCred.AccessToken, channel, message)
+			err := postToSlack(slackCred.AccessToken, channel, finalMessage)
 			if err != nil {
 				p.logger.ErrorContext(ctx, "Failed to post to Slack", "workflowID", payload.WorkflowID, "error", err)
 				return err
@@ -146,7 +134,7 @@ func (p *TaskProcessor) handleExecuteWorkflowTask(ctx context.Context, t *asynq.
 		}
 	}
 
-	p.logger.InfoContext(ctx, "Finished executing workflow successfully", "workflowID", payload.WorkflowID)
+	p.logger.InfoContext(ctx, "Finished executing dynamic workflow successfully", "workflowID", payload.WorkflowID)
 	return nil
 }
 
