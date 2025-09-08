@@ -16,8 +16,8 @@ FROM node:24-alpine AS runner
 
 WORKDIR /app
 
-COPY --from=builder /app/.output .output
+COPY --from=builder /webapp/.output .output
 
 EXPOSE 3000
 
-CMD ["pnpm", "run", "preview"]
+CMD ["pnpm", "run", "start"]
