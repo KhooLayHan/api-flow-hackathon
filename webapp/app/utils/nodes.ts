@@ -15,4 +15,6 @@ export const customNodes = {
       message: 'A new commit was pushed!',
     },
   },
-};
+} as const;
+
+export type CustomNodeKeys = keyof typeof customNodes;
