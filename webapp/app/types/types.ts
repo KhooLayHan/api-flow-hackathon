@@ -1,4 +1,4 @@
-import type { Element } from '@vue-flow/core';
+import type { Element, GraphNode } from '@vue-flow/core';
 
 export interface GithubTriggerData {
   repository: string;
@@ -12,8 +12,21 @@ export interface SlackActionData {
 
 export type CustomNodeData = GithubTriggerData | SlackActionData;
 
+export type CustomElement = Element<CustomNodeData>;
+
+export type CustomGraphNode = GraphNode<CustomNodeData>;
+
 export interface WorkflowDefinition {
-  elements: Element<CustomNodeData>[];
+  elements: CustomElement;
+}
+
+export interface Workflow {
+  id: number;
+  name: string;
+  githubRepo: string | null;
+  definition: WorkflowDefinition;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface NodeUpdatePayload {
