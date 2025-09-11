@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue';
-import { VueFlow, useVueFlow, type GraphNode, type Element } from '@vue-flow/core';
+import { VueFlow, useVueFlow } from '@vue-flow/core';
 import { useRoute } from 'vue-router';
 
 import { customNodes, type CustomNodeKeys } from '@/utils/nodes';
@@ -11,7 +11,7 @@ import ConfigPanel from '@/components/ConfigPanel.vue';
 import '@vue-flow/core/dist/style.css';
 import '@vue-flow/core/dist/theme-default.css';
 
-import type { NodeUpdatePayload } from '@/types';
+import type { CustomGraphNode, NodeUpdatePayload, Workflow, CustomElement, CustomNodeData } from '@/types/types';
 
 // 1. Setup
 const route = useRoute();
@@ -20,25 +20,17 @@ const workflowId = Number(route.params.id);
 // Core Vue Flow instance for programmatic access
 const { onPaneClick, onNodeClick, addNodes, screenToFlowCoordinate } = useVueFlow();
 
-const elements = ref<Element[]>([]);
-const selectedNode = ref<GraphNode | null>(null);
+const elements = ref<CustomElement[]>([]);
+const selectedNode = ref<CustomGraphNode | null>(null);
 const workflowName = ref('Loading...');
-
 const isSaving = ref(false);
-
-// const elements = ref([
-//   // Hardcoded
-//   { id: '1', type: 'input', label: 'Trigger', position: { x: 100, y: 100 } },
-//   { id: '2', label: 'Log Message', position: { x: 300, y: 100 } },
-//   { id: 'e1-2', source: '1', target: '2' },
-// ]);
 
 // 2. Fetch and loads the data.
 const {
   data: workflowData,
   pending,
   error,
-} = await useAsyncData(`workflow-${workflowId}`, () => $fetch(`/api/workflows/${workflowId}`));
+} = await useAsyncData<{ workflow: Workflow }>(`workflow-${workflowId}`, () => $fetch(`/api/workflows/${workflowId}`));
 
 watchEffect(() => {
   if (!workflowData.value) return;
@@ -47,20 +39,13 @@ watchEffect(() => {
 
   if (workflowData.value?.workflow) {
     const workflow = workflowData.value.workflow;
-    elements.value = workflow.definition.elements || []; // Use saved elements of empty array
     workflowName.value = workflow.name;
+    elements.value = workflow.definition?.elements || []; // Use saved elements of empty array
 
     console.log(elements.value);
   }
 });
 
-// Process workflowData.value and update elements accordingly
-// if (workflowData.value?.workflow?.definition) {
-//   elements.value = workflowData.value.workflow.definition || []; // Use saved elements of empty array
-
-//   console.log(elements.value);
-// }
-//
 // 3. Event handlers & actions
 
 // Node selection for ConfigPanel
@@ -83,7 +68,7 @@ function onAddNode(nodeType: CustomNodeKeys) {
     type: newNodeTemplate.type,
     label: newNodeTemplate.label,
     position: screenToFlowCoordinate({ x: 150, y: 150 }),
-    data: { ...newNodeTemplate.data },
+    data: { ...newNodeTemplate.data } as CustomNodeData,
   };
 
   addNodes([newNode]);
@@ -125,13 +110,6 @@ async function handleTriggerWorkflow() {
   try {
     const response = await $fetch(`/api/workflows/${workflowId}/trigger`, {
       method: 'POST',
-      // body: {
-      //   name: workflowData.value || 'My Workflow',
-      //   definition: {
-      //     elements: elements.value,
-      //   },
-      //   githubRepo: elements.value.find(el => el.type === 'githubTrigger')?.data.repository,
-      // },
     });
 
     console.log(`Workflow triggered successfully! Job ID: ${response.jobId}`);
@@ -145,7 +123,6 @@ function handleNodeUpdate(updatePayload: NodeUpdatePayload) {
 
   if (nodeToUpdate) {
     nodeToUpdate.data = updatePayload.data;
-    // elements.value = elements.value.map(el => el.id === nodeToUpdate.id ? nodeToUpdate : el);
   }
 }
 </script>
@@ -180,35 +157,11 @@ function handleNodeUpdate(updatePayload: NodeUpdatePayload) {
         >
           {{ isSaving ? 'Saving...' : 'Save' }}
         </button>
-        <!-- <button class="p-2 rounded bg-blue-500 hover:bg-blue-600 text-white w-full mb-2 @click="handleSaveWorkflow">Run Manually</button> -->
+        <button class="p-2 rounded bg-green-500 hover:bg-green-600 text-white w-full" @click="handleTriggerWorkflow">
+          Run Manually
+        </button>
       </div>
     </div>
-    <!-- Top bar with save button -->
-    <!-- <div class="flex justify-between items-center p-4">
-    <h1 class="text-2xl font-bold">Workflow</h1>
-    <button
-      class="px-8 py-16 bg-color-#007bff color-white border-0 border-radius-4px cursor-pointer"
-      @click="saveWorkflow"
-    >
-      Save
-    </button>
-  </div> -->
-
-    <!-- Loading indicator using the 'pending' state from useAsyncData -->
-    <!-- <div v-if="pending" class="flex justify-center items-center h-full">
-    <span>Loading workflow...</span>
-  </div> -->
-
-    <!-- Error message -->
-    <!-- <div v-else-if="error" class="flex justify-center items-center h-full">
-    <button>Error loading workflow: {{ error }}</button>
-  </div> -->
-
-    <!-- Main Vue canvas -->
-    <!-- <div v-else class="h-full w-full">
-    <VueFlow v-model="elements">
-      // TODO: Implement workflow controls, minimaps, etc. -->
-    <!-- </VueFlow> -->
 
     <!-- Main canvas -->
     <div class="flex-1 relative">

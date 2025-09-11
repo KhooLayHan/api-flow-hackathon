@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import type { NodeUpdatePayload, GithubTriggerData } from '@/types/types';
+import type { CustomGraphNode, NodeUpdatePayload, GithubTriggerData, SlackActionData } from '@/types/types';
 
 const props = defineProps<{
   selectedNode: CustomGraphNode | null;
