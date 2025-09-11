@@ -2,18 +2,9 @@
 import { ref, watch, computed } from 'vue';
 import type { NodeUpdatePayload, GithubTriggerData } from '@/types/types';
 
-// const props = defineProps({
-//   selectedNode: {
-//     type: Object,
-//     default: null,
-//   },
-// });
-
 const props = defineProps<{
   selectedNode: CustomGraphNode | null;
 }>();
-
-// const emit = defineEmits(['update:node']);
 
 const emit = defineEmits<{
   (e: 'update:node', payload: NodeUpdatePayload): void;
