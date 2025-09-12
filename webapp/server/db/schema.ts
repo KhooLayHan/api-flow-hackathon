@@ -2,9 +2,9 @@ import { pgTable, text, serial, jsonb, timestamp, varchar, uuid } from 'drizzle-
 
 export const workflows = pgTable('workflows', {
   id: serial('id').primaryKey(),
-  // userId: uuid('user_id').notNull(),
+  userId: uuid('user_id').notNull(),
   name: varchar('name', { length: 256 }).notNull(),
-  githubRepo: varchar('github_repo', { length: 256 }).notNull(),
+  githubRepo: varchar('github_repo', { length: 256 }),
   definition: jsonb('definition').default('{}').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

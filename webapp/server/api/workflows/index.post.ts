@@ -4,9 +4,13 @@ import { db } from '~~/server/utils/db';
 import { workflows } from '~~/server/db/schema';
 import { serverSupabaseUser } from '#supabase/server';
 
+const WorkflowDefinitionSchema = z.object({
+  elements: z.array(z.any().optional()),
+});
+
 const SaveWorkflowSchema = z.object({
   name: z.string().min(1, { message: 'Workflow name cannot be empty' }),
-  definition: z.record(z.any(), z.unknown()),
+  definition: WorkflowDefinitionSchema,
 });
 
 export default defineEventHandler(async event => {
@@ -32,7 +36,7 @@ export default defineEventHandler(async event => {
   const { name, definition } = validation.data;
   console.log(`Saving workflow: ${name}`, definition);
 
-  const [newWorkflow] = await db.insert(workflows).values({ name, definition }).returning();
+  const [newWorkflow] = await db.insert(workflows).values({ name, definition, userId: user.id }).returning();
 
   return {
     workflow: newWorkflow,
