@@ -18,9 +18,9 @@ const route = useRoute();
 const workflowId = Number(route.params.id);
 
 // Core Vue Flow instance for programmatic access
-const { onPaneClick, onNodeClick, addNodes, screenToFlowCoordinate } = useVueFlow();
+const { onPaneClick, onNodeClick, addNodes, screenToFlowCoordinate, toObject, nodes, edges } = useVueFlow();
 
-const elements = ref<CustomElement[]>([]);
+// const elements = ref<CustomElement[]>([]);
 const selectedNode = ref<CustomGraphNode | null>(null);
 const workflowName = ref('Loading...');
 const isSaving = ref(false);
@@ -40,9 +40,11 @@ watchEffect(() => {
   if (workflowData.value?.workflow) {
     const workflow = workflowData.value.workflow;
     workflowName.value = workflow.name;
-    elements.value = workflow.definition?.elements || []; // Use saved elements of empty array
+    // elements.value = workflow.definition?.elements || [];
+    const savedElements = workflow.definition?.elements || [];
 
-    console.log(elements.value);
+    nodes.value = savedElements.filter(element => element.position);
+    edges.value = savedElements.filter(element => !element.position);
   }
 });
 
@@ -74,6 +76,15 @@ function onAddNode(nodeType: CustomNodeKeys) {
   addNodes([newNode]);
 }
 
+function handleNodeUpdate(updatePayload: NodeUpdatePayload) {
+  // const nodeToUpdate = elements.value.find(el => el.id === updatePayload.nodeId);
+  const nodeToUpdate = nodes.value.find(n => n.id === updatePayload.nodeId);
+
+  if (nodeToUpdate) {
+    nodeToUpdate.data = updatePayload.data;
+  }
+}
+
 // 3. Save the data
 async function handleSaveWorkflow() {
   if (!workflowId) return;
@@ -81,15 +92,17 @@ async function handleSaveWorkflow() {
   isSaving.value = true;
   console.log('Saving workflow...');
 
+  const elementsToSave = toObject();
+
   // Find the GitHub trigger node, if it exists
-  const githubTriggerNode = elements.value.find(el => el.type === 'githubTrigger');
+  const githubTriggerNode = elementsToSave.nodes.find(n => n.type === 'githubTrigger');
   const repoName = githubTriggerNode?.data?.repository;
 
-  const { data, error } = await useFetch(`/api/workflows/${workflowId}/update`, {
+  const { error: saveError } = await useFetch(`/api/workflows/${workflowId}/update`, {
     method: 'PUT',
     body: {
       name: workflowName.value,
-      definition: { elements: elements.value }, // Save the elements under a key
+      definition: { elements: [...elementsToSave.nodes, ...elementsToSave.edges] }, // Save the elements under a key
       githubRepo: repoName, // Pass the githubRepo if a githubTrigger node exists
     },
     immediate: false,
@@ -97,12 +110,12 @@ async function handleSaveWorkflow() {
 
   isSaving.value = false;
 
-  if (error.value) {
-    console.error(`Error saving workflow: ${error.value}`);
+  if (saveError) {
+    console.error(`Error saving workflow: ${saveError}`);
     return;
   }
 
-  console.log(`Workflow saved successfully, ${data.value}!`);
+  // console.log(`Workflow saved successfully, ${data.value}!`);
   alert('Workflow saved!');
 }
 
@@ -115,14 +128,6 @@ async function handleTriggerWorkflow() {
     console.log(`Workflow triggered successfully! Job ID: ${response.jobId}`);
   } catch (error) {
     console.error(`Error triggering workflow: ${error}`);
-  }
-}
-
-function handleNodeUpdate(updatePayload: NodeUpdatePayload) {
-  const nodeToUpdate = elements.value.find(el => el.id === updatePayload.nodeId);
-
-  if (nodeToUpdate) {
-    nodeToUpdate.data = updatePayload.data;
   }
 }
 </script>
@@ -169,7 +174,7 @@ function handleNodeUpdate(updatePayload: NodeUpdatePayload) {
       <div v-else-if="error" class="absolute inset-0 flex items-center justify-center bg-red-100 text-red-700">
         Error loading workflows: {{ error.message }}
       </div>
-      <VueFlow v-model="elements" class="bg-white">
+      <VueFlow class="bg-white">
         <!-- Register the custom components for rendering. -->
         <template #node-githubTrigger="props">
           <GithubNode v-bind="props" />
