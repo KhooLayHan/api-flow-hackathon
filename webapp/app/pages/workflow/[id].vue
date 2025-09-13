@@ -18,9 +18,9 @@ const route = useRoute();
 const workflowId = Number(route.params.id);
 
 // Core Vue Flow instance for programmatic access
-const { onPaneClick, onNodeClick, addNodes, screenToFlowCoordinate, toObject, nodes, edges } = useVueFlow();
+const { onPaneClick, onNodeClick, addNodes, screenToFlowCoordinate, toObject, nodes } = useVueFlow();
 
-// const elements = ref<CustomElement[]>([]);
+const elements = ref<CustomElement[]>([]);
 const selectedNode = ref<CustomGraphNode | null>(null);
 const workflowName = ref('Loading...');
 const isSaving = ref(false);
@@ -40,11 +40,12 @@ watchEffect(() => {
   if (workflowData.value?.workflow) {
     const workflow = workflowData.value.workflow;
     workflowName.value = workflow.name;
-    // elements.value = workflow.definition?.elements || [];
-    const savedElements = workflow.definition?.elements || [];
+    elements.value = workflow.definition?.elements || [];
+    // const savedElements = workflow.definition?.elements || [];
 
-    nodes.value = savedElements.filter(element => element.position);
-    edges.value = savedElements.filter(element => !element.position);
+    // console.log(savedElements);
+
+    // nodes.value = savedElements.filter(isEdge);
   }
 });
 
@@ -98,7 +99,7 @@ async function handleSaveWorkflow() {
   const githubTriggerNode = elementsToSave.nodes.find(n => n.type === 'githubTrigger');
   const repoName = githubTriggerNode?.data?.repository;
 
-  const { error: saveError } = await useFetch(`/api/workflows/${workflowId}/update`, {
+  const { error: saveError } = await useFetch(`server/api/workflows/${workflowId}/update`, {
     method: 'PUT',
     body: {
       name: workflowName.value,
