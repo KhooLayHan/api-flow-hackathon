@@ -1,10 +1,8 @@
 import { pgTable, serial, varchar, jsonb, timestamp, uuid, text } from "drizzle-orm/pg-core"
-import { sql } from "drizzle-orm"
-
-
+// import { sql } from "drizzle-orm"
 
 export const workflows = pgTable("workflows", {
-	id: serial().primaryKey().notNull(),
+  id: serial().primaryKey().notNull(),
 	name: varchar({ length: 256 }).notNull(),
 	definition: jsonb().default({}).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
