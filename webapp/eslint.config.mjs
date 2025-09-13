@@ -23,4 +23,7 @@ export default withNuxt(
       ],
     },
   },
+  {
+    ignores: ['server/db/migrations/**/*.ts'],
+  },
 );

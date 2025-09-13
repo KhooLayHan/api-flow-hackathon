@@ -18,3 +18,6 @@ public/**/*
 pnpm-lock.yaml
 yarn.lock
 package-lock.json
+
+# Ignore auto-generated database migrations
+server/db/migrations
