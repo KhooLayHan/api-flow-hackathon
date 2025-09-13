@@ -17,7 +17,7 @@ export type CustomElement = Element<CustomNodeData>;
 export type CustomGraphNode = GraphNode<CustomNodeData>;
 
 export interface WorkflowDefinition {
-  elements: CustomElement;
+  elements: CustomElement[];
 }
 
 export interface Workflow {
